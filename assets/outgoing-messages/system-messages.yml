@@ -1,0 +1,28 @@
+# Telegram copy: strain cards, callbacks, and shared outbound error/reply bodies.
+press_if_found: "Press if you found this strain"
+encounter_line: "%d times"
+encounter_line_singular: "%d time"
+community_button: "Community"
+callback_recorded: "Added to your collection."
+callback_removed_one: "Removed one instance of %s from your collection."
+callback_expired: "This confirmation link has expired or was already used."
+
+# After first logged encounter for this strain (total 0→1); DM only.
+encounter_additive_zero_to_one_followup: "First encounter logged. To withdraw please tap the original button again."
+
+strain_search_disabled: "Strain search is unavailable right now."
+strain_search_temporarily_unavailable: "Strain search is temporarily unavailable."
+strain_please_provide_name: "Please provide a strain name."
+strain_no_matching: "No matching strain found."
+
+unknown_query_fallback: "Unknown query"
+
+subscription_enabled: "Subscription enabled."
+subscription_disabled: "Subscription disabled."
+
+url_invalid: "Please send a valid URL."
+url_domain_not_whitelisted: "URL domain is not whitelisted."
+url_unreadable_body: "Unable to extract readable body content from URL."
+url_no_strain_candidates: "No strain names could be extracted."
+url_no_known_strains: "No known strains found from URL content."
+url_strains_not_found_heading: "Not found:"

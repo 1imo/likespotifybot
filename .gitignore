@@ -1,0 +1,31 @@
+.env
+.env.test
+.env.local
+.env.*.local
+
+# Local module cache (e.g. CI/sandbox builds)
+.gomodcache/
+
+# Go build artifacts
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+
+# Local/editor noise
+.DS_Store
+.idea/
+.vscode/
+.cursor/
+
+# Runtime/cache artifacts
+.nuglabs-cache/
+tmp/
+*.log
+
+analytics.md

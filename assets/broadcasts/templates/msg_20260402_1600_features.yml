@@ -1,0 +1,18 @@
+---
+id: msg_20260402_1600_features
+type: message
+audience: all
+scheduled_at: 2026-04-03T16:00:00Z
+---
+
+text: |
+  <b>Nug Labs bot update is live</b>
+
+  <b>New today</b>
+  • Improved strain cards with cleaner sections
+  • Better deeplinks for quick /start lookups
+  • URL extraction now reports found vs missing strains
+  • Group-aware subscriptions and broadcast reliability improvements
+  • New /start, /help, /about, /legal, /links pages
+
+  Try searching any strain name and let us know what you think.

@@ -1,0 +1,11 @@
+---
+id: msg_001
+type: message
+audience: active_users
+---
+
+text: |
+  <b>🚀 New feature just dropped!</b>
+
+  You can now take <b>daily quizzes</b> directly in this bot.
+  Try it out and let us know what you think 👇

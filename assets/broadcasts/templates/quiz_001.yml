@@ -1,0 +1,15 @@
+---
+id: quiz_001
+type: quiz
+audience: all
+scheduled_at: 2026-03-31T20:05:00Z
+---
+
+question: What is the capital of France?
+options:
+- Berlin
+- Madrid
+- Paris
+- Rome
+correct_index: 2
+explanation: Paris is the capital of France.
