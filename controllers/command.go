@@ -52,8 +52,8 @@ func (c *CommandController) Handle(ctx context.Context, actorUserID, chatID int6
 			return handlemessage.OutboundMessage{}, nil
 		}
 		return c.spotify.HandleStart(ctx, actorUserID, chatID)
-	case "toggle-on-off":
-		return c.spotify.HandleToggleOnOff(ctx, actorUserID, chatID)
+	case "toggle", "toggle-on-off":
+		return c.spotify.HandleToggle(ctx, actorUserID, chatID)
 	case "help":
 		s, err := c.policyHandler.Handle(ctx, actorUserID, chatID, "help")
 		return handlemessage.OutboundMessage{Text: s}, err

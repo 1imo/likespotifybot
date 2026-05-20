@@ -63,7 +63,7 @@ func authenticatedWelcome() string {
 
 While music is playing, pause and resume within about four seconds to ❤️ save the current track.
 
-Use the buttons below to manage your connection.`
+Use /toggle to turn gesture detection on or off.`
 }
 
 func unauthenticatedKeyboard() tgbotapi.InlineKeyboardMarkup {
@@ -74,11 +74,6 @@ func unauthenticatedKeyboard() tgbotapi.InlineKeyboardMarkup {
 
 func authenticatedKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return handlemessage.NewInlineKeyboard([][]tgbotapi.InlineKeyboardButton{
-		{tgbotapi.NewInlineKeyboardButtonData("✅ Connected", CallbackStatus)},
-		{
-			tgbotapi.NewInlineKeyboardButtonData("Gesture settings", CallbackGestures),
-			tgbotapi.NewInlineKeyboardButtonData("Status / debug", CallbackStatus),
-		},
 		{tgbotapi.NewInlineKeyboardButtonData("Disconnect Spotify", CallbackDisconnect)},
 	})
 }

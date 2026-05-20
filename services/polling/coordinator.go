@@ -2,6 +2,9 @@ package polling
 
 import (
 	"context"
+	"fmt"
+	"html"
+	"strings"
 	"sync"
 	"time"
 
@@ -143,25 +146,55 @@ func (c *Coordinator) pollUser(ctx context.Context, telegramID int64, now time.T
 		return
 	}
 
-	if err := c.client.SaveTrack(ctx, telegramID, result.TrackID); err != nil {
+	if !result.GestureEnabled {
+		c.track(ctx, telegramID, result.TrackID, "skipped",
+			gestureLikeMeta(result, false, false, map[string]any{"reason": "gesture_disabled"}))
+		c.sendGestureDisabledHint(telegramID, result)
+		return
+	}
+
+	if c.debounce != nil && c.debounce.InCooldown(telegramID, result.TrackID) {
+		return
+	}
+
+	inLibrary, err := c.client.TrackInLibrary(ctx, telegramID, result.TrackID)
+	if err != nil {
 		if c.log != nil {
-			c.log.Warn("event=gesture-like status=error telegram_id=%d track_id=%s source=%s err=%v",
-				telegramID, result.TrackID, result.Source, err)
+			c.log.Warn("event=gesture-like status=error telegram_id=%d step=library_check track_id=%s err=%v",
+				telegramID, result.TrackID, err)
 		}
-		c.track(ctx, telegramID, result.TrackID, "error", map[string]any{"error": err.Error(), "source": result.Source})
+	} else if inLibrary {
+		c.markLikedQuiet(ctx, telegramID, result.TrackID)
+		c.track(ctx, telegramID, result.TrackID, "skipped",
+			gestureLikeMeta(result, true, true, map[string]any{"reason": "already_in_library"}))
+		if c.log != nil {
+			c.log.Info("event=gesture-like status=skipped telegram_id=%d track_id=%s reason=already_in_library",
+				telegramID, result.TrackID)
+		}
 		return
 	}
 
 	if c.debounce != nil {
 		c.debounce.Mark(telegramID, result.TrackID)
 	}
-	_ = c.repo.RecordLikeDebounce(ctx, telegramID, result.TrackID)
+
+	if err := c.client.SaveTrack(ctx, telegramID, result.TrackID); err != nil {
+		if c.log != nil {
+			c.log.Warn("event=gesture-like status=error telegram_id=%d track_id=%s source=%s err=%v",
+				telegramID, result.TrackID, result.Source, err)
+		}
+		c.track(ctx, telegramID, result.TrackID, "error",
+			gestureLikeMeta(result, true, false, map[string]any{"error": err.Error()}))
+		return
+	}
+
+	c.markLikedQuiet(ctx, telegramID, result.TrackID)
 
 	if c.log != nil {
 		c.log.Info("event=gesture-like status=ok telegram_id=%d track_id=%s source=%s saved=true",
 			telegramID, result.TrackID, result.Source)
 	}
-	c.track(ctx, telegramID, result.TrackID, "ok", map[string]any{"source": result.Source})
+	c.track(ctx, telegramID, result.TrackID, "ok", gestureLikeMeta(result, true, false, nil))
 
 	notify, err := c.repo.NotifyOnGesture(ctx, telegramID)
 	if err != nil || !notify || !c.cfg.NotifyOnGesture || c.bot == nil {
@@ -170,10 +203,86 @@ func (c *Coordinator) pollUser(ctx context.Context, telegramID int64, now time.T
 		}
 		return
 	}
-	msg := tgbotapi.NewMessage(telegramID, "❤️ Saved current track")
+	c.sendSavedTrackNotification(telegramID, result)
+}
+
+func (c *Coordinator) sendGestureDisabledHint(telegramID int64, result *gesture.Result) {
+	if c.bot == nil {
+		return
+	}
+	hintKey := result.TrackID + ":disabled_hint"
+	if c.debounce != nil && c.debounce.InCooldown(telegramID, hintKey) {
+		return
+	}
+	msg := tgbotapi.NewMessage(telegramID, gestureDisabledCaption(result))
+	msg.ParseMode = tgbotapi.ModeHTML
+	if _, err := c.bot.Send(msg); err != nil {
+		if c.log != nil {
+			c.log.Warn("event=gesture-like status=error telegram_id=%d step=telegram_disabled_hint err=%v", telegramID, err)
+		}
+		return
+	}
+	if c.debounce != nil {
+		c.debounce.Mark(telegramID, hintKey)
+	}
+}
+
+func (c *Coordinator) sendSavedTrackNotification(telegramID int64, result *gesture.Result) {
+	caption := savedTrackCaption(result)
+	if result.AlbumImageURL != "" {
+		photo := tgbotapi.NewPhoto(telegramID, tgbotapi.FileURL(result.AlbumImageURL))
+		photo.Caption = caption
+		photo.ParseMode = tgbotapi.ModeHTML
+		if _, err := c.bot.Send(photo); err == nil {
+			return
+		} else if c.log != nil {
+			c.log.Warn("event=gesture-like status=error telegram_id=%d step=telegram_photo err=%v", telegramID, err)
+		}
+	}
+	msg := tgbotapi.NewMessage(telegramID, caption)
+	msg.ParseMode = tgbotapi.ModeHTML
 	if _, err := c.bot.Send(msg); err != nil && c.log != nil {
 		c.log.Warn("event=gesture-like status=error telegram_id=%d step=telegram_notify err=%v", telegramID, err)
 	}
+}
+
+func (c *Coordinator) markLikedQuiet(ctx context.Context, telegramID int64, trackID string) {
+	if c.debounce != nil {
+		c.debounce.Mark(telegramID, trackID)
+	}
+	_ = c.repo.RecordLikeDebounce(ctx, telegramID, trackID)
+}
+
+func formatTrackLine(result *gesture.Result) (titleHTML, byArtistHTML string) {
+	name := result.TrackName
+	if name == "" {
+		name = "this track"
+	}
+	titleHTML = html.EscapeString(name)
+	if result.Artist != "" {
+		byArtistHTML = " by " + html.EscapeString(result.Artist)
+	}
+	return titleHTML, byArtistHTML
+}
+
+func gestureDisabledCaption(result *gesture.Result) string {
+	title, by := formatTrackLine(result)
+	return fmt.Sprintf(
+		"We wanted to save <b>%s</b>%s to Your Library, but quick pause / unpause is <b>off</b>.\n\nUse /toggle to enable.",
+		title, by,
+	)
+}
+
+func savedTrackCaption(result *gesture.Result) string {
+	title, by := formatTrackLine(result)
+	link := html.EscapeString(spotifyTrackURL(result.TrackID))
+	linkLine := "\n\n" + link
+	return fmt.Sprintf("❤️ Saved <b>%s</b>%s%s", title, by, linkLine)
+}
+
+func spotifyTrackURL(trackID string) string {
+	id := strings.TrimPrefix(trackID, "spotify:track:")
+	return "https://open.spotify.com/track/" + id
 }
 
 func emptyTrack(id string) string {
@@ -181,6 +290,23 @@ func emptyTrack(id string) string {
 		return "-"
 	}
 	return id
+}
+
+func gestureLikeMeta(result *gesture.Result, gestureEnabled, alreadyInLibrary bool, extra map[string]any) map[string]any {
+	meta := map[string]any{
+		"track_id":           result.TrackID,
+		"track_name":         result.TrackName,
+		"artist":             result.Artist,
+		"source":             result.Source,
+		"progress_ms":        result.ProgressMs,
+		"track_duration_ms":  result.TrackDurationMs,
+		"gesture_enabled":    gestureEnabled,
+		"already_in_library": alreadyInLibrary,
+	}
+	for k, v := range extra {
+		meta[k] = v
+	}
+	return meta
 }
 
 func (c *Coordinator) track(ctx context.Context, userID int64, trackID, status string, meta map[string]any) {

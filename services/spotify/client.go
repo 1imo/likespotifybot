@@ -17,10 +17,14 @@ const spotifyAPIBase = "https://api.spotify.com/v1"
 
 // PlaybackSnapshot is normalized playback state for gesture detection.
 type PlaybackSnapshot struct {
-	TrackID      string
-	IsPlaying    bool
-	ProgressMs   int
-	DeviceActive bool
+	TrackID        string
+	TrackName      string
+	Artist         string
+	AlbumImageURL  string
+	DurationMs     int
+	IsPlaying      bool
+	ProgressMs     int
+	DeviceActive   bool
 }
 
 // Client calls Spotify Web API with token refresh and retries.
@@ -75,7 +79,18 @@ func (c *Client) GetPlayback(ctx context.Context, telegramID int64) (*PlaybackSn
 		IsPlaying  bool `json:"is_playing"`
 		ProgressMs int  `json:"progress_ms"`
 		Item       *struct {
-			ID string `json:"id"`
+			ID         string `json:"id"`
+			Name       string `json:"name"`
+			DurationMs int    `json:"duration_ms"`
+			Artists    []struct {
+				Name string `json:"name"`
+			} `json:"artists"`
+			Album struct {
+				Images []struct {
+					URL    string `json:"url"`
+					Height int    `json:"height"`
+				} `json:"images"`
+			} `json:"album"`
 		} `json:"item"`
 	}
 	if err := json.Unmarshal(body, &raw); err != nil {
@@ -84,8 +99,70 @@ func (c *Client) GetPlayback(ctx context.Context, telegramID int64) (*PlaybackSn
 	snap := &PlaybackSnapshot{IsPlaying: raw.IsPlaying, ProgressMs: raw.ProgressMs, DeviceActive: true}
 	if raw.Item != nil {
 		snap.TrackID = raw.Item.ID
+		snap.TrackName = raw.Item.Name
+		snap.DurationMs = raw.Item.DurationMs
+		artistNames := make([]string, 0, len(raw.Item.Artists))
+		for _, a := range raw.Item.Artists {
+			if a.Name != "" {
+				artistNames = append(artistNames, a.Name)
+			}
+		}
+		snap.Artist = strings.Join(artistNames, ", ")
+		snap.AlbumImageURL = pickAlbumImageURL(raw.Item.Album.Images)
 	}
 	return snap, nil
+}
+
+func pickAlbumImageURL(images []struct {
+	URL    string `json:"url"`
+	Height int    `json:"height"`
+}) string {
+	var bestURL string
+	bestH := -1
+	for _, img := range images {
+		if img.URL == "" {
+			continue
+		}
+		if img.Height > bestH {
+			bestH = img.Height
+			bestURL = img.URL
+		}
+	}
+	if bestURL != "" {
+		return bestURL
+	}
+	if len(images) > 0 {
+		return images[0].URL
+	}
+	return ""
+}
+
+func trackURI(trackID string) string {
+	if strings.HasPrefix(trackID, "spotify:") {
+		return trackID
+	}
+	return "spotify:track:" + trackID
+}
+
+// TrackInLibrary reports whether the track is already in the user's saved library.
+func (c *Client) TrackInLibrary(ctx context.Context, telegramID int64, trackID string) (bool, error) {
+	acc, err := c.ensureToken(ctx, telegramID)
+	if err != nil {
+		return false, err
+	}
+	u := spotifyAPIBase + "/me/library/contains?uris=" + url.QueryEscape(trackURI(trackID))
+	body, status, err := c.doWithRetry(ctx, acc, http.MethodGet, u, nil)
+	if err != nil {
+		return false, err
+	}
+	if status < 200 || status >= 300 {
+		return false, fmt.Errorf("library contains status=%d body=%s", status, string(body))
+	}
+	var saved []bool
+	if err := json.Unmarshal(body, &saved); err != nil {
+		return false, err
+	}
+	return len(saved) > 0 && saved[0], nil
 }
 
 func (c *Client) SaveTrack(ctx context.Context, telegramID int64, trackID string) error {
@@ -95,11 +172,7 @@ func (c *Client) SaveTrack(ctx context.Context, telegramID int64, trackID string
 	}
 	// Dev-mode apps (Feb 2026+) require PUT /me/library with Spotify URIs;
 	// legacy PUT /me/tracks returns 403 even with user-library-modify.
-	trackURI := trackID
-	if !strings.HasPrefix(trackURI, "spotify:") {
-		trackURI = "spotify:track:" + trackID
-	}
-	u := spotifyAPIBase + "/me/library?uris=" + url.QueryEscape(trackURI)
+	u := spotifyAPIBase + "/me/library?uris=" + url.QueryEscape(trackURI(trackID))
 	body, status, err := c.doWithRetry(ctx, acc, http.MethodPut, u, nil)
 	if err != nil {
 		return err

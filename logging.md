@@ -52,20 +52,20 @@ Adaptive per-user intervals (see `services/polling/schedule.go`): **2s** playing
 - **Source:** `services/polling/coordinator.go`
 - **When:** Each due Spotify poll for a connected user.
 - **`status=snapshot`:** `device_active`, `playing`, `track_id`, `progress_ms`, `prev_*`, `wall_ms`, `progress_delta_ms`
-- **`status=done`:** `outcome` (`no_like`, `like_edge`, `like_stall`), `next_poll_ms`, `schedule_reason` (`playing`, `paused_under_15s`, `paused_15s_plus`, `inactive_under_180s`, `inactive_180s_plus`)
+- **`status=done`:** `outcome` (`no_like`, `like_edge`, `like_stall` if `GESTURE_STALL_ENABLED=true`), `next_poll_ms`, `schedule_reason` (`playing`, `paused_fresh`, `paused_under_15s`, `paused_15s_plus`, `inactive_under_180s`, `inactive_180s_plus`)
 - **`status=error`:** `step` (`load_state`, `spotify_api`, `gesture_eval`, `save_state`), `err`
 
 ### `event=gesture-eval`
 
 - **Source:** `services/gesture/engine.go`
 - **When:** Gesture decision on each poll (`outcome`, `detail`, optional `track_id` / timing fields).
-- **Outcomes include:** `no_device`, `gesture_disabled`, `pause_started`, `still_paused`, `like_edge`, `like_stall`, `resume_too_slow`, `stall_too_long`, `like_skipped`, `no_gesture`
+- **Outcomes include:** `no_device`, `gesture_check_error`, `like_gesture_disabled`, `pause_started`, `still_paused`, `like_edge`, `like_stall`, `resume_too_slow`, `stall_too_long`, `like_skipped`, `no_gesture`
 
 ### `event=gesture-like`
 
 - **Source:** `services/polling/coordinator.go`
 - **When:** Track saved (or save failed).
-- **Fields:** `telegram_id`, `track_id`, `source` (`edge` / `stall`), `status` (`ok` / `error`), `err` on error
+- **Fields:** `telegram_id`, `track_id`, `source` (`edge` / `stall`), `status` (`ok` / `skipped` / `error`), `reason` on skip (`gesture_disabled`, `already_in_library`)
 
 ### `event=spotify-api`
 

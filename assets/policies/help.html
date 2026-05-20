@@ -2,13 +2,15 @@
 
 <b>Commands</b>
 <b>/start</b> — Connect Spotify or manage your account
-<b>/toggle-on-off</b> — Enable or disable quick pause → like gesture
+<b>/toggle</b> — Enable or disable quick pause → like gesture
 <b>/help</b> — This page
 <b>/about</b> — About this bot
 <b>/legal</b> — Terms and privacy
 
 <b>How to save a track</b>
-While Spotify is playing, pause and resume within about four seconds. The bot saves the current track to Your Library.
+While Spotify is playing, <b>pause</b> (playback stops) and <b>resume</b> within about four seconds. The bot saves the current track to Your Library. A brief tap that Spotify reports as paused works best.
+
+Gestures are ignored during the <b>first 2.5 seconds</b> of each track (e.g. right after a skip or when a song starts), so starting playback or changing tracks won’t trigger a save.
 
 <b>Requirements</b>
 Spotify must be active (app or device). The bot polls playback while you are connected.

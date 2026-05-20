@@ -8,7 +8,7 @@ import (
 )
 
 // SpotifyScopes required for playback polling and library modify.
-const SpotifyScopes = "user-read-currently-playing user-read-playback-state user-library-modify"
+const SpotifyScopes = "user-read-currently-playing user-read-playback-state user-library-read user-library-modify"
 
 // SpotifyConfig holds LikeSpotifyBot Spotify-related env configuration.
 type SpotifyConfig struct {
@@ -23,10 +23,15 @@ type SpotifyConfig struct {
 	PollPausedSlowAfter time.Duration
 	PollInactiveAfter   time.Duration
 
-	QuickPauseMax   time.Duration
-	GestureCooldown time.Duration
+	QuickPauseMax       time.Duration
+	EdgeFastResumeMax   time.Duration // max pause for edge like after only pause_started (no still_paused)
+	TrackStartGrace     time.Duration
+	GestureCooldown  time.Duration
 	NotifyOnGesture bool
+	StallEnabled    bool // infer pause from playhead lag while playing=true (off by default)
 	StallSlackRatio float64
+	StallMin        time.Duration
+	StallMinWall    time.Duration
 
 	MaxAPIRetries int
 }
@@ -46,11 +51,16 @@ func LoadSpotifyConfig() SpotifyConfig {
 		PollInactive:        durationMsEnv("POLL_INTERVAL_INACTIVE_MS", 60000),
 		PollPausedSlowAfter: durationMsEnv("POLL_PAUSED_SLOW_AFTER_MS", 15000),
 		PollInactiveAfter:   durationSecEnv("POLL_INACTIVE_AFTER_SECONDS", 180),
-		QuickPauseMax:       durationMsEnv("GESTURE_QUICK_PAUSE_MAX_MS", 4000),
-		GestureCooldown:     durationSecEnv("GESTURE_COOLDOWN_SECONDS", 30),
+		QuickPauseMax:     durationMsEnv("GESTURE_QUICK_PAUSE_MAX_MS", 4000),
+		EdgeFastResumeMax: durationMsEnv("GESTURE_EDGE_FAST_RESUME_MS", 2800),
+		TrackStartGrace:   durationMsEnv("GESTURE_TRACK_START_GRACE_MS", 4000),
+		GestureCooldown:    durationSecEnv("GESTURE_COOLDOWN_SECONDS", 30),
 		NotifyOnGesture:     boolEnvDefault("NOTIFY_ON_GESTURE", true),
-		StallSlackRatio:     floatEnvDefault("GESTURE_STALL_SLACK_RATIO", 0.90),
-		MaxAPIRetries:       intEnvDefault("SPOTIFY_API_MAX_RETRIES", 3),
+		StallEnabled:        boolEnvDefault("GESTURE_STALL_ENABLED", false),
+		StallSlackRatio: floatEnvDefault("GESTURE_STALL_SLACK_RATIO", 0.90),
+		StallMin:        durationMsEnv("GESTURE_STALL_MIN_MS", 1000),
+		StallMinWall:    durationMsEnv("GESTURE_STALL_MIN_WALL_MS", 2000),
+		MaxAPIRetries:   intEnvDefault("SPOTIFY_API_MAX_RETRIES", 3),
 	}
 }
 

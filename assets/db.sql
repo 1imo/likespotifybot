@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS playback_poll_state (
 );
 
 ALTER TABLE playback_poll_state ADD COLUMN IF NOT EXISTS inactive_since TIMESTAMPTZ;
+ALTER TABLE playback_poll_state ADD COLUMN IF NOT EXISTS pause_confirmed BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Debounce duplicate likes on the same track (optional persistence).
 CREATE TABLE IF NOT EXISTS gesture_like_debounce (

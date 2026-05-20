@@ -24,8 +24,19 @@ func pollSchedule(cfg utils.SpotifyConfig, prev spotify.PollState, snap *spotify
 
 	if !snap.IsPlaying {
 		pauseStart := prev.PausedAt
-		if pauseStart != nil && now.Sub(*pauseStart) >= cfg.PollPausedSlowAfter {
-			return cfg.PollPaused, "paused_15s_plus"
+		if pauseStart != nil {
+			pauseFor := now.Sub(*pauseStart)
+			if pauseFor >= cfg.PollPausedSlowAfter {
+				return cfg.PollPaused, "paused_15s_plus"
+			}
+			// Fresh pause: poll sooner so still_paused / quick resume are not missed between 2–4s gaps.
+			if !prev.PauseConfirmed && pauseFor < 5*time.Second {
+				half := cfg.PollPlaying / 2
+				if half < 800*time.Millisecond {
+					half = 800 * time.Millisecond
+				}
+				return half, "paused_fresh"
+			}
 		}
 		return cfg.PollPlaying, "paused_under_15s"
 	}

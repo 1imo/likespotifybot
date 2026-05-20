@@ -19,12 +19,13 @@ type account struct {
 
 // PollState is the last known playback snapshot for gesture detection.
 type PollState struct {
-	TrackID       string
-	IsPlaying     bool
-	ProgressMs    int
-	PausedAt      *time.Time
-	LastPolledAt  time.Time
-	InactiveSince *time.Time
+	TrackID         string
+	IsPlaying       bool
+	ProgressMs      int
+	PausedAt        *time.Time
+	PauseConfirmed  bool // true after a poll saw still_paused (not just pause_started)
+	LastPolledAt    time.Time
+	InactiveSince   *time.Time
 }
 
 // Repository persists Spotify auth and playback state.
@@ -189,13 +190,14 @@ func (r *Repository) ToggleQuickPauseLike(ctx context.Context, telegramID int64)
 
 func (r *Repository) LoadPollState(ctx context.Context, telegramID int64) (PollState, error) {
 	row := r.store.QueryRowContext(ctx,
-		`SELECT COALESCE(track_id, ''), is_playing, progress_ms, paused_at, last_polled_at, inactive_since
+		`SELECT COALESCE(track_id, ''), is_playing, progress_ms, paused_at,
+		        COALESCE(pause_confirmed, false), last_polled_at, inactive_since
 		 FROM playback_poll_state WHERE telegram_id = $1`,
 		0, telegramID,
 	)
 	var s PollState
 	var pausedAt, inactiveSince sql.NullTime
-	if err := row.Scan(&s.TrackID, &s.IsPlaying, &s.ProgressMs, &pausedAt, &s.LastPolledAt, &inactiveSince); err != nil {
+	if err := row.Scan(&s.TrackID, &s.IsPlaying, &s.ProgressMs, &pausedAt, &s.PauseConfirmed, &s.LastPolledAt, &inactiveSince); err != nil {
 		if err == sql.ErrNoRows {
 			return PollState{}, nil
 		}
@@ -225,17 +227,18 @@ func (r *Repository) SavePollState(ctx context.Context, telegramID int64, s Poll
 		lastPolled = time.Now().UTC()
 	}
 	_, err := r.store.ExecContext(ctx,
-		`INSERT INTO playback_poll_state (telegram_id, track_id, is_playing, progress_ms, paused_at, inactive_since, last_polled_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+		`INSERT INTO playback_poll_state (telegram_id, track_id, is_playing, progress_ms, paused_at, pause_confirmed, inactive_since, last_polled_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
 		 ON CONFLICT (telegram_id) DO UPDATE SET
 		   track_id = EXCLUDED.track_id,
 		   is_playing = EXCLUDED.is_playing,
 		   progress_ms = EXCLUDED.progress_ms,
 		   paused_at = EXCLUDED.paused_at,
+		   pause_confirmed = EXCLUDED.pause_confirmed,
 		   inactive_since = EXCLUDED.inactive_since,
 		   last_polled_at = EXCLUDED.last_polled_at,
 		   updated_at = NOW()`,
-		telegramID, nullIfEmpty(s.TrackID), s.IsPlaying, s.ProgressMs, paused, inactive, lastPolled,
+		telegramID, nullIfEmpty(s.TrackID), s.IsPlaying, s.ProgressMs, paused, s.PauseConfirmed, inactive, lastPolled,
 	)
 	return err
 }

@@ -108,7 +108,7 @@ func (s *HandleHTTPService) handleSpotifyCallback(w http.ResponseWriter, r *http
 	s.trackOAuth(reqCtx, telegramID, "ok", nil)
 
 	if s.bot != nil {
-		msg := tgbotapi.NewMessage(telegramID, "✅ Spotify connected! Use /start to see your menu.")
+		msg := tgbotapi.NewMessage(telegramID, "✅ Spotify connected!")
 		_, _ = s.bot.Send(msg)
 	}
 

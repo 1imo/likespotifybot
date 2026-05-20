@@ -7,7 +7,7 @@ Built on a Go Telegram bot boilerplate (routes → controllers → use-cases, Po
 ## Features
 
 - `/start` with inline keyboards (Connect / Connected / Disconnect)
-- `/toggle-on-off` to enable or disable gesture detection
+- `/toggle` to enable or disable gesture detection
 - Spotify Authorization Code OAuth with secure state tokens
 - Playback polling with configurable intervals
 - Gesture engine: quick pause then resume → save track
